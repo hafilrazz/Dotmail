@@ -57,7 +57,7 @@ def generate_dot_variations(canonical: str):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Hi! Send me a Gmail address (e.g. john.doe@gmail.com) and I'll list every "
+        "Hi! Send me a Gmail address (e.g. ritsu@gmail.com) and I'll list every "
         "dot-variation of it — Gmail treats them all as the same inbox.\n\n"
         f"Note: for usernames longer than {MAX_LOCAL_LENGTH} characters I'll only "
         "give you the total count, since the full list gets huge."
@@ -70,7 +70,7 @@ async def handle_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not result:
         await update.message.reply_text(
             "That doesn't look like a valid Gmail address. Try something like "
-            "john.doe@gmail.com."
+            "ritsu@gmail.com."
         )
         return
 
