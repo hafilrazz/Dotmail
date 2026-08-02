@@ -128,7 +128,7 @@ async def send_full_list(update_or_query, canonical: str, domain: str, as_file: 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Hi! Send me a Gmail address (e.g. john.doe@gmail.com) and I'll list every "
+        "Hi! Send me a Gmail address (e.g. ritsu@gmail.com) and I'll list every "
         "dot-variation of it — Gmail treats them all as the same inbox.\n\n"
         "Send /help to see all commands."
     )
@@ -152,7 +152,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def about_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Gmail ignores dots in the part of an address before the @, so "
-        "john.doe@gmail.com and johndoe@gmail.com deliver to the same inbox. "
+        "ri.tsu@gmail.com and ritsu@gmail.com deliver to the same inbox. "
         "This bot lists those equivalent addresses — handy for setting up "
         "inbox filters or seeing which variant a signup form accepted. It "
         "doesn't store the emails you send it."
@@ -161,14 +161,14 @@ async def about_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def dots_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Usage: /dots john.doe@gmail.com")
+        await update.message.reply_text("Usage: /dots ritsu@gmail.com")
         return
     await process_email(update.message, context, context.args[0])
 
 
 async def count_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Usage: /count john.doe@gmail.com")
+        await update.message.reply_text("Usage: /count ritsu@gmail.com")
         return
     result = extract_local_and_domain(context.args[0])
     if not result:
@@ -183,7 +183,7 @@ async def count_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def random_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Usage: /random john.doe@gmail.com [count]")
+        await update.message.reply_text("Usage: /random ritsu@gmail.com [count]")
         return
     result = extract_local_and_domain(context.args[0])
     if not result:
@@ -198,7 +198,7 @@ async def random_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def tag_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
-        await update.message.reply_text("Usage: /tag john.doe@gmail.com shopping")
+        await update.message.reply_text("Usage: /tag ritsu@gmail.com shopping")
         return
     result = extract_local_and_domain(context.args[0])
     if not result:
@@ -233,7 +233,7 @@ async def process_email(message, context: ContextTypes.DEFAULT_TYPE, text: str):
     if not result:
         await message.reply_text(
             "That doesn't look like a valid Gmail address. Try something like "
-            "john.doe@gmail.com."
+            "ritsu@gmail.com."
         )
         return
 
