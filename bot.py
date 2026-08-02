@@ -115,7 +115,9 @@ async def send_full_list(update_or_query, canonical: str, domain: str, as_file: 
     if send_as_file:
         buf = BytesIO(body.encode("utf-8"))
         buf.name = f"{canonical}_dot_variations.txt"
-        await update_or_query.reply_document(document=buf, caption=header.strip())
+        await update_or_query.reply_document(
+            document=buf, caption=header.strip() + "\n\n@ritsurex"
+        )
     else:
         await update_or_query.reply_text(
             message, parse_mode="Markdown", reply_markup=result_keyboard(canonical, domain)
