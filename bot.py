@@ -35,6 +35,9 @@ RATE_LIMIT_MAX = 8
 RATE_LIMIT_WINDOW = 60
 _request_log = defaultdict(deque)
 
+# Pre-compile regex for /tag command to avoid recompilation on every call
+TAG_SANITIZE_REGEX = re.compile(r"[^A-Za-z0-9_-]")
+
 
 # ---------------------------------------------------------------------------
 # Core logic
@@ -57,6 +60,17 @@ def extract_local_and_domain(email: str):
     return canonical, domain
 
 
+def build_variation_from_mask(canonical: str, mask: int) -> str:
+    """Build a single dot-variation from a canonical string and a bitmask.
+    Each bit represents whether to insert a dot at that position."""
+    chars = [canonical[0]]
+    for i in range(1, len(canonical)):
+        if mask & (1 << (i - 1)):
+            chars.append(".")
+        chars.append(canonical[i])
+    return "".join(chars)
+
+
 def generate_dot_variations(canonical: str):
     """All ways to insert dots between characters of canonical (Gmail forbids
     a dot as the very first/last character or two dots in a row, so we only
@@ -66,12 +80,7 @@ def generate_dot_variations(canonical: str):
         return [canonical]
     variations = []
     for mask in range(2 ** (n - 1)):
-        chars = [canonical[0]]
-        for i in range(1, n):
-            if mask & (1 << (i - 1)):
-                chars.append(".")
-            chars.append(canonical[i])
-        variations.append("".join(chars))
+        variations.append(build_variation_from_mask(canonical, mask))
     return variations
 
 
@@ -207,7 +216,7 @@ async def tag_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("That doesn't look like a valid Gmail address.")
         return
     canonical, domain = result
-    tag = re.sub(r"[^A-Za-z0-9_-]", "", context.args[1])
+    tag = TAG_SANITIZE_REGEX.sub("", context.args[1])
     if not tag:
         await update.message.reply_text("Tag must contain letters, numbers, - or _.")
         return
@@ -261,14 +270,7 @@ async def send_random_sample(message, canonical: str, domain: str, n: int):
     else:
         n = min(n, total)
         masks = random.sample(range(total), n)
-        sample = []
-        for mask in masks:
-            chars = [canonical[0]]
-            for i in range(1, len(canonical)):
-                if mask & (1 << (i - 1)):
-                    chars.append(".")
-                chars.append(canonical[i])
-            sample.append("".join(chars))
+        sample = [build_variation_from_mask(canonical, mask) for mask in masks]
 
     full_list = [f"{v}@{domain}" for v in sample]
     body = "\n".join(full_list)
