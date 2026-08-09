@@ -29,7 +29,7 @@ PORT = int(os.environ.get("PORT", 10000))
 # (e.g. 20 chars -> 524,288 combos), so we just report the total instead.
 MAX_LOCAL_LENGTH = 15
 
-# Basic per-user rate limiting: at most RATE_LIMIT_MAX requests per
+# Basic per-user rate limiting: at most RATE_LIMIT_MAX requests per use
 # RATE_LIMIT_WINDOW seconds. Keeps one user from hammering the free instance.
 RATE_LIMIT_MAX = 8
 RATE_LIMIT_WINDOW = 60
