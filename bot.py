@@ -1,13 +1,19 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+from __future__ import annotations
+
+>>>>>>> Stashed changes
 import asyncio
+import logging
 import os
 import random
+import time
 from collections import defaultdict, deque
+from dataclasses import dataclass
 from io import BytesIO
 from itertools import product
-import logging
-import time
-from typing import Optional, Tuple, List
+from typing import Final
 
 =======
 from __future__ import annotations
@@ -36,51 +42,103 @@ from telegram.ext import (
 )
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+# ---------------------------------------------------------------------------
+# Logging & Configuration
+# ---------------------------------------------------------------------------
+
+>>>>>>> Stashed changes
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
-    level=logging.INFO
+    format="%(asctime)s | %(levelname)-7s | %(name)s: %(message)s",
+    level=logging.INFO,
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("GmailDotBot")
 
-# --- Configuration ---
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-PORT = int(os.environ.get("PORT", 10000))
-MAX_LOCAL_LENGTH = 15  # 2^(15-1) = 16,384 combinations ceiling before forcing sampling
+BOT_TOKEN: Final[str] = os.environ.get("BOT_TOKEN", "")
+PORT: Final[int] = int(os.environ.get("PORT", 10000))
+MAX_INLINE_LENGTH: Final[int] = 14  # Max chars before prompting sampling/export
 
 
-# --- Utility Classes & Functions ---
+# ---------------------------------------------------------------------------
+# Domain Logic
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True, slots=True)
+class GmailAddress:
+    canonical: str
+    domain: str
+
+    @property
+    def full(self) -> str:
+        return f"{self.canonical}@{self.domain}"
+
+    @property
+    def total_combinations(self) -> int:
+        return 1 << (len(self.canonical) - 1)
+
+    @classmethod
+    def parse(cls, raw: str) -> GmailAddress | None:
+        raw = raw.strip().lower().rstrip(".")
+        if "@" not in raw:
+            return None
+
+        local, _, domain = raw.partition("@")
+        if domain not in ("gmail.com", "googlemail.com"):
+            return None
+
+        canonical = local.split("+")[0].replace(".", "")
+        if not canonical or not canonical.isalnum():
+            return None
+
+        return cls(canonical=canonical, domain=domain)
+
+    def generate_variations(self, sample_size: int | None = None) -> list[str]:
+        n = len(self.canonical)
+        if n <= 1:
+            return [self.full]
+
+        options = [(c,) if i == 0 else (c, f".{c}") for i, c in enumerate(self.canonical)]
+        total = self.total_combinations
+
+        if sample_size and sample_size < total:
+            chosen = set(random.sample(range(total), sample_size))
+            return [
+                f"{''.join(p)}@{self.domain}"
+                for idx, p in enumerate(product(*options))
+                if idx in chosen
+            ]
+
+        return [f"{''.join(p)}@{self.domain}" for p in product(*options)]
+
 
 class RateLimiter:
     """Sliding-window per-user rate limiter."""
-    def __init__(self, max_requests: int = 8, window_seconds: int = 60):
-        self.max_requests = max_requests
+
+    def __init__(self, max_hits: int = 8, window_seconds: int = 60) -> None:
+        self.max_hits = max_hits
         self.window = window_seconds
-        self.history = defaultdict(deque)
+        self.history: defaultdict[int, deque[float]] = defaultdict(deque)
 
     def is_limited(self, user_id: int) -> bool:
-        now = time.time()
-        user_queue = self.history[user_id]
-        while user_queue and now - user_queue[0] > self.window:
-            user_queue.popleft()
-        if len(user_queue) >= self.max_requests:
+        now = time.monotonic()
+        q = self.history[user_id]
+        while q and now - q[0] > self.window:
+            q.popleft()
+        if len(q) >= self.max_hits:
             return True
-        user_queue.append(now)
+        q.append(now)
         return False
 
 
 limiter = RateLimiter()
 
 
-def parse_gmail(email: str) -> Optional[Tuple[str, str]]:
-    """Validates and extracts canonical local part and domain."""
-    email = email.strip().lower().rstrip(".")
-    if "@" not in email:
-        return None
-    
-    local, _, domain = email.partition("@")
-    if domain not in ("gmail.com", "googlemail.com"):
-        return None
+# ---------------------------------------------------------------------------
+# UI Helpers & View
+# ---------------------------------------------------------------------------
 
+<<<<<<< Updated upstream
     # Gmail strips everything after '+' and ignores dots entirely
     canonical = local.split("+")[0].replace(".", "")
     if not canonical or not canonical.isalnum():
@@ -208,12 +266,16 @@ rate_limiter = UserRateLimiter()
 
 
 def get_action_keyboard() -> InlineKeyboardMarkup:
+=======
+def action_keyboard() -> InlineKeyboardMarkup:
+>>>>>>> Stashed changes
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🎲 20 Random", callback_data="btn_random"),
-            InlineKeyboardButton("#️⃣ Total Count", callback_data="btn_count"),
+            InlineKeyboardButton("🎲 20 Random", callback_data="act_random"),
+            InlineKeyboardButton("🔢 Total Count", callback_data="act_count"),
         ],
         [
+<<<<<<< Updated upstream
             InlineKeyboardButton("📄 Export Full List (.txt)", callback_data="btn_file"),
 =======
 # ---------------------------------------------------------------------------
@@ -229,56 +291,85 @@ def main_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("📄 Export to .txt File", callback_data="act_file"),
 >>>>>>> Stashed changes
+=======
+            InlineKeyboardButton("📄 Export Full List (.txt)", callback_data="act_file"),
+>>>>>>> Stashed changes
         ],
     ])
 
 
 <<<<<<< Updated upstream
 async def deliver_results(
-    target, 
-    canonical: str, 
-    domain: str, 
-    items: List[str], 
-    force_file: bool = False
-):
-    """Handles formatted text delivery or text document attachment."""
-    total_combinations = 1 << (len(canonical) - 1)
-    full_addresses = [f"{v}@{domain}" for v in items]
-    content = "\n".join(full_addresses)
-    
-    header = (
-        f"📧 *Target:* `{canonical}@{domain}`\n"
-        f"🔢 *Displaying:* `{len(items):,}` of `{total_combinations:,}` total variations\n\n"
-    )
+    target,
+    email: GmailAddress,
+    items: list[str],
+    as_file: bool = False,
+) -> None:
+    body = "\n".join(items)
 
-    if force_file or len(content) > 3500:
-        file_buffer = BytesIO(content.encode("utf-8"))
-        file_buffer.name = f"{canonical}_gmail_variations.txt"
+    if as_file or len(body) > 3500:
+        buf = BytesIO(body.encode("utf-8"))
+        buf.name = f"{email.canonical}_variations.txt"
         await target.reply_document(
-            document=file_buffer,
-            caption=f"📁 Export generated for `{canonical}@{domain}` ({len(items):,} addresses).",
+            document=buf,
+            caption=(
+                f"📂 *Export Complete*\n"
+                f"• Address: `{email.full}`\n"
+                f"• Output: `{len(items):,}` of `{email.total_combinations:,}` variations"
+            ),
             parse_mode=ParseMode.MARKDOWN,
         )
-    else:
-        message = f"{header}```\n{content}\n```"
-        await target.reply_text(
-            message, 
-            parse_mode=ParseMode.MARKDOWN, 
-            reply_markup=get_action_keyboard()
-        )
+        return
+
+    text = (
+        f"🎯 *Target:* `{email.full}`\n"
+        f"📊 *Showing:* `{len(items):,}` / `{email.total_combinations:,}` variations\n\n"
+        f"```\n{body}\n```"
+    )
+    await target.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=action_keyboard())
 
 
-# --- Handlers ---
+# ---------------------------------------------------------------------------
+# Bot Handlers
+# ---------------------------------------------------------------------------
 
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "✨ *Gmail Dot Generator Bot*\n\n"
+        "Send any Gmail address to get its dot permutations.\n\n"
+        "*Commands:*\n"
+        "• `/dots <email>` — Generate dot combinations\n"
+        "• `/random <email> [n]` — Get random samples (default 20)\n"
+        "• `/count <email>` — Get total permutations count\n"
+        "• `/tag <email> <label>` — Generate a `+tag` alias\n"
+        "• `/about` — How Gmail routing works"
+    )
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "💡 *How Gmail Routing Works*\n\n"
+        "Gmail ignores two components in usernames:\n"
+        "1. **Dots (`.`):** `j.o.h.n@gmail.com` delivers to `john@gmail.com`.\n"
+        "2. **Plus signs (`+`):** `john+news@gmail.com` delivers to `john@gmail.com`.\n\n"
+        "Use these variants to filter incoming mail or create distinct platform logins."
+    )
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args:
+        await update.message.reply_text("❗ Usage: `/count user@gmail.com`", parse_mode=ParseMode.MARKDOWN)
+        return
+
+    email = GmailAddress.parse(context.args[0])
+    if not email:
+        await update.message.reply_text("⚠️ Invalid Gmail address.")
+        return
+
     await update.message.reply_text(
-        "👋 *Gmail Dot Trick Generator*\n\n"
-        "Send any Gmail address directly, or use the commands below:\n"
-        "• `/dots <email>` — Generate all dot permutations\n"
-        "• `/random <email> [n]` — Get `n` random samples\n"
-        "• `/count <email>` — Calculate total permutations\n"
-        "• `/tag <email> <label>` — Generate a clean `+tag` alias\n"
-        "• `/about` — Technical explanation",
+        f"🔢 `{email.full}` has *{email.total_combinations:,}* possible dot combinations.",
         parse_mode=ParseMode.MARKDOWN,
 =======
 async def reply_with_results(
@@ -317,6 +408,7 @@ async def reply_with_results(
     )
 
 
+<<<<<<< Updated upstream
 # ---------------------------------------------------------------------------
 # Command & Query Handlers
 # ---------------------------------------------------------------------------
@@ -405,39 +497,43 @@ async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("❗ Usage: `/random username@gmail.com [count]`", parse_mode=ParseMode.MARKDOWN)
+=======
+async def cmd_random(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args:
+        await update.message.reply_text("❗ Usage: `/random user@gmail.com [count]`", parse_mode=ParseMode.MARKDOWN)
         return
 
-    parsed = parse_gmail(context.args[0])
-    if not parsed:
-        await update.message.reply_text("⚠️ Please provide a valid `@gmail.com` address.")
+    email = GmailAddress.parse(context.args[0])
+    if not email:
+        await update.message.reply_text("⚠️ Invalid Gmail address.")
+>>>>>>> Stashed changes
         return
 
-    canonical, domain = parsed
     count = 20
     if len(context.args) > 1 and context.args[1].isdigit():
-        count = max(1, min(int(context.args[1]), 200))
+        count = max(1, min(int(context.args[1]), 250))
 
-    variations = generate_variations(canonical, sample_size=count)
-    await deliver_results(update.message, canonical, domain, variations)
+    results = email.generate_variations(sample_size=count)
+    await deliver_results(update.message, email, results)
 
 
-async def cmd_tag(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_tag(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if len(context.args) < 2:
-        await update.message.reply_text("❗ Usage: `/tag username@gmail.com label`", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("❗ Usage: `/tag user@gmail.com label`", parse_mode=ParseMode.MARKDOWN)
         return
 
-    parsed = parse_gmail(context.args[0])
-    if not parsed:
-        await update.message.reply_text("⚠️ Please provide a valid `@gmail.com` address.")
+    email = GmailAddress.parse(context.args[0])
+    if not email:
+        await update.message.reply_text("⚠️ Invalid Gmail address.")
         return
 
-    canonical, domain = parsed
-    clean_tag = "".join(c for c in context.args[1] if c.isalnum() or c in "-_")
-    if not clean_tag:
-        await update.message.reply_text("⚠️ Tags can only contain alphanumeric characters, hyphens, and underscores.")
+    tag = "".join(c for c in context.args[1] if c.isalnum() or c in "-_")
+    if not tag:
+        await update.message.reply_text("⚠️ Tags can only contain alphanumeric characters, hyphens, or underscores.")
         return
 
     await update.message.reply_text(
+<<<<<<< Updated upstream
         f"🏷️ *Tagged Alias:*\n`{canonical}+{clean_tag}@{domain}`",
 =======
 async def handle_random(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -476,71 +572,71 @@ async def handle_tag(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text(
         f"🏷️ *Tagged Address:*\n`{email.canonical}+{tag}@{email.domain}`",
 >>>>>>> Stashed changes
+=======
+        f"🏷️ *Tagged Address:*\n`{email.canonical}+{tag}@{email.domain}`",
+>>>>>>> Stashed changes
         parse_mode=ParseMode.MARKDOWN,
     )
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 async def route_email_processing(message, context: ContextTypes.DEFAULT_TYPE, raw_text: str):
+=======
+async def handle_address_flow(message, context: ContextTypes.DEFAULT_TYPE, raw_text: str) -> None:
+>>>>>>> Stashed changes
     if limiter.is_limited(message.from_user.id):
-        await message.reply_text("⏳ Rate limit exceeded. Please wait a minute before making more requests.")
+        await message.reply_text("⏳ Rate limit exceeded (8 requests / min). Please wait a moment.")
         return
 
-    parsed = parse_gmail(raw_text)
-    if not parsed:
-        await message.reply_text("⚠️ That doesn't look like a valid `@gmail.com` address.")
+    email = GmailAddress.parse(raw_text)
+    if not email:
+        await message.reply_text("⚠️ Please send a valid `@gmail.com` or `@googlemail.com` address.")
         return
 
-    canonical, domain = parsed
-    context.user_data["active_email"] = (canonical, domain)
-    length = len(canonical)
-    total = 1 << (length - 1)
+    context.user_data["active_email"] = email
 
-    if length > MAX_LOCAL_LENGTH:
+    if len(email.canonical) > MAX_INLINE_LENGTH:
         await message.reply_text(
-            f"ℹ️ `{canonical}@{domain}` contains {length} characters (*{total:,}* combinations).\n"
-            "Listing all variations exceeds payload limits. Use the buttons below:",
+            f"ℹ️ `{email.full}` has *{email.total_combinations:,}* combinations.\n"
+            "That exceeds inline chat limits. Choose an option:",
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=get_action_keyboard(),
+            reply_markup=action_keyboard(),
         )
         return
 
-    variations = generate_variations(canonical)
-    await deliver_results(message, canonical, domain, variations)
+    results = email.generate_variations()
+    await deliver_results(message, email, results)
 
 
-async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await route_email_processing(update.message, context, update.message.text)
-
-
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
 
-    cached = context.user_data.get("active_email")
-    if not cached:
-        await query.message.reply_text("⚠️ Session expired. Please send the Gmail address again.")
+    email: GmailAddress | None = context.user_data.get("active_email")
+    if not email:
+        await query.message.reply_text("⚠️ Session expired. Please send your address again.")
         return
 
-    canonical, domain = cached
-    action = query.data
-
-    if action == "btn_random":
-        variations = generate_variations(canonical, sample_size=20)
-        await deliver_results(query.message, canonical, domain, variations)
-    elif action == "btn_count":
-        total = 1 << (len(canonical) - 1)
-        await query.message.reply_text(
-            f"📊 `{canonical}@{domain}` produces *{total:,}* unique aliases.",
-            parse_mode=ParseMode.MARKDOWN,
-        )
-    elif action == "btn_file":
-        variations = generate_variations(canonical)
-        await deliver_results(query.message, canonical, domain, variations, force_file=True)
+    match query.data:
+        case "act_random":
+            results = email.generate_variations(sample_size=20)
+            await deliver_results(query.message, email, results)
+        case "act_count":
+            await query.message.reply_text(
+                f"🔢 `{email.full}` produces *{email.total_combinations:,}* unique variations.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        case "act_file":
+            results = email.generate_variations()
+            await deliver_results(query.message, email, results, as_file=True)
 
 
-# --- Native Async Health Check Server ---
+# ---------------------------------------------------------------------------
+# Health Server (Native Async)
+# ---------------------------------------------------------------------------
 
+<<<<<<< Updated upstream
 async def handle_health_check(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     await reader.read(1024)
 =======
@@ -607,43 +703,52 @@ async def run_health_server(reader: asyncio.StreamReader, writer: asyncio.Stream
 >>>>>>> Stashed changes
     response = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK"
     writer.write(response)
+=======
+async def health_check_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    await reader.read(512)
+    writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK")
+>>>>>>> Stashed changes
     await writer.drain()
     writer.close()
     await writer.wait_closed()
 
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 async def start_health_server(port: int):
     server = await asyncio.start_server(handle_health_check, "0.0.0.0", port)
     logger.info(f"Health check endpoint active on port {port}")
     return server
+=======
+# ---------------------------------------------------------------------------
+# Application Entrypoint
+# ---------------------------------------------------------------------------
+>>>>>>> Stashed changes
 
-
-# --- App Bootstrapper ---
-
-def main():
+def main() -> None:
     if not BOT_TOKEN:
-        raise RuntimeError("CRITICAL: Set the 'BOT_TOKEN' environment variable.")
+        raise RuntimeError("Environment variable BOT_TOKEN is required.")
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Register Handlers
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("help", cmd_start))
+    # Handlers
+    app.add_handler(CommandHandler(["start", "help"], cmd_start))
     app.add_handler(CommandHandler("about", cmd_about))
-    app.add_handler(CommandHandler("dots", cmd_dots))
+    app.add_handler(CommandHandler("dots", lambda u, c: handle_address_flow(u.message, c, c.args[0]) if c.args else u.message.reply_text("❗ Usage: `/dots user@gmail.com`", parse_mode=ParseMode.MARKDOWN)))
     app.add_handler(CommandHandler("count", cmd_count))
     app.add_handler(CommandHandler("random", cmd_random))
     app.add_handler(CommandHandler("tag", cmd_tag))
-    app.add_handler(CallbackQueryHandler(handle_callback_query))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, lambda u, c: handle_address_flow(u.message, c, u.message.text)))
 
-    # Initialize async health server on the event loop before polling starts
-    async def post_init(application: Application):
-        await start_health_server(PORT)
+    # Start non-blocking health server directly on the main event loop
+    async def post_init(_: Application) -> None:
+        await asyncio.start_server(health_check_handler, "0.0.0.0", PORT)
+        logger.info("Health probe listening on port %d", PORT)
 
     app.post_init = post_init
 
+<<<<<<< Updated upstream
     logger.info("Bot initialized. Starting polling...")
 =======
 # ---------------------------------------------------------------------------
@@ -672,6 +777,9 @@ def main() -> None:
 
     app.post_init = on_startup
 
+    logger.info("Bot starting in polling mode...")
+>>>>>>> Stashed changes
+=======
     logger.info("Bot starting in polling mode...")
 >>>>>>> Stashed changes
     app.run_polling(allowed_updates=Update.ALL_TYPES)
