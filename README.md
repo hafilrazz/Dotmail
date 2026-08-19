@@ -45,7 +45,7 @@ python bot.py
 **Option B — manual setup**
 1. Push this folder to a GitHub repo.
 2. In Render, click **New > Web Service**, connect the repo.
-3. Environment: `Python 3`.
+3. Environment: `Python 3`
 4. Build command: `pip install -r requirements.txt`
 5. Start command: `python bot.py`
 6. Add an environment variable `BOT_TOKEN` with your token.
