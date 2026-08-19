@@ -1,14 +1,14 @@
 # Gmail Dot-Variation Telegram Bot
 
 Gmail ignores dots in the part of an address before the `@`, so
-`john.doe@gmail.com`, `johndoe@gmail.com`, and `jo.hndoe@gmail.com` all
+`rit.su@gmail.com`, `ritsu@gmail.com`, and `r.itsu@gmail.com` all
 deliver to the exact same inbox. This bot takes a Gmail address and lists
 every valid dot-variation of it.
 
 ## How it works
 
 - Send `/start` for instructions.
-- Send any Gmail address (e.g. `john.doe@gmail.com`).
+- Send any Gmail address (e.g. `rits.u@gmail.com`).
 - The bot strips existing dots, then generates every way dots can be
   re-inserted between the letters (Gmail never allows a dot as the first or
   last character, or two dots in a row).
