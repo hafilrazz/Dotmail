@@ -74,7 +74,7 @@ def build_variation_from_mask(canonical: str, mask: int) -> str:
 def generate_dot_variations(canonical: str):
     """All ways to insert dots between characters of canonical (Gmail forbids
     a dot as the very first/last character or two dots in a row, so we only
-    ever toggle a single dot per gap between letters)."""
+    ever toggle a single dot per gap between letters)"""
     n = len(canonical)
     if n <= 1:
         return [canonical]
