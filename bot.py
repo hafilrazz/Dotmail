@@ -62,7 +62,7 @@ def extract_local_and_domain(email: str):
 
 def build_variation_from_mask(canonical: str, mask: int) -> str:
     """Build a single dot-variation from a canonical string and a bitmask.
-    Each bit represents whether to insert a dot at that position."""
+    Each bit represents whether to insert a dot at that position. """
     chars = [canonical[0]]
     for i in range(1, len(canonical)):
         if mask & (1 << (i - 1)):
