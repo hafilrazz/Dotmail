@@ -96,7 +96,7 @@ def is_rate_limited(user_id: int) -> bool:
 
 
 def result_keyboard(canonical: str, domain: str) -> InlineKeyboardMarkup:
-    # callback_data is capped at 64 bytes by Telegram, so we keep it short
+    # callback_data is capped at 64 bytes by Telegram, so we keep it short 
     # and rely on context.user_data (set alongside) to hold the full email.
     return InlineKeyboardMarkup(
         [
